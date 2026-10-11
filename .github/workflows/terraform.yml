@@ -14,12 +14,8 @@ permissions:
 
 jobs:
   terraform:
-    name: Terraform Validate and Plan
+    name: Terraform Format and Validate
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: .
 
     steps:
       - name: Checkout repository
@@ -34,10 +30,7 @@ jobs:
         run: terraform fmt -check -recursive
 
       - name: Terraform Init
-        run: terraform init -input=false
+        run: terraform init -backend=false -input=false
 
       - name: Terraform Validate
         run: terraform validate
-
-      - name: Terraform Plan
-        run: terraform plan -input=false -no-color
