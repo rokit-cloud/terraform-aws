@@ -1,10 +1,10 @@
-name: Terraform CI
+name: "Terraform CI/CD Pipeline"
 
 on:
-  pull_request:
+  push:
     branches:
       - main
-  push:
+  pull_request:
     branches:
       - main
   workflow_dispatch:
@@ -13,12 +13,12 @@ permissions:
   contents: read
 
 jobs:
-  terraform:
-    name: Terraform Format and Validate
+  terraform-plan:
+    name: "Terraform Plan"
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Setup Terraform
@@ -26,11 +26,61 @@ jobs:
         with:
           terraform_version: "1.10.5"
 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
       - name: Terraform Format Check
         run: terraform fmt -check -recursive
 
       - name: Terraform Init
-        run: terraform init -backend=false -input=false
+        run: terraform init
 
       - name: Terraform Validate
         run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - name: Upload Terraform Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: tfplan
+
+  terraform-apply:
+    name: "Terraform Apply"
+    needs: terraform-plan
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.5"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Download Terraform Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: .
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
